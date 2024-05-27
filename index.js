@@ -8,6 +8,23 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+const verifyToken = async (req, res, next) => {
+    const token = req.cookies?.token;
+    console.log('middleware detected token', token);
+    if (!token) {
+        return res.status(401).send({ message: 'not authorized' });
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ message: 'not authorized' });
+        }
+        console.log('decoded value in the token', decoded);
+        req.user = decoded;
+        next();
+    })
+}
+
+
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1towayy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -31,6 +48,23 @@ async function run() {
 
         const userCollection = client.db('Recipes').collection('users');
         const recipeCollection = client.db('Recipes').collection('recipes');
+
+        app.post('/jwt', (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
+                expiresIn: '1h'
+            });
+            res.cookie('token', token, cookieOptions).send({ success: true });
+        })
+
+        app.post('/logout', (req, res) => {
+            const user = req.body;
+            console.log('logging out', user);
+            res.clearCookie('token', { ...cookieOptions, maxAge: 0 }).send({
+                success: true
+            })
+        })
+
 
         app.post('/addRecipes', async (req, res) => {
             const recipe = req.body;
@@ -73,11 +107,19 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/recipe/:id', async (req, res) => {
+        app.get('/recipe/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await recipeCollection.findOne(query);
             res.send(result)
+        })
+
+        app.patch('/buy', async (req, res) => {
+            const user = req.query.email;
+            const money = req.query.money;
+            const query = { userEmail: user };
+            const result = await userCollection.updateOne(query, { $inc: { userCoin: money * 100 } });
+            res.send(result);
         })
 
         app.patch('/purchase/:id', async (req, res) => {
