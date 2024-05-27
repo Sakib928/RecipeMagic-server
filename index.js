@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1towayy.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -72,9 +72,31 @@ async function run() {
             const result = await userCollection.findOne(query);
             res.send(result);
         })
+
+        app.get('/recipe/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await recipeCollection.findOne(query);
+            res.send(result)
+        })
+
+        app.patch('/purchase/:id', async (req, res) => {
+            const id = req.params.id;
+            const user = req.query.user;
+            const creator = req.query.creator;
+            console.log(id, user, creator);
+            const idQuery = { _id: new ObjectId(id) };
+            const res1 = await recipeCollection.updateOne(idQuery, { $push: { purchasedBy: user }, $inc: { watchCount: +1 } });
+            // res.send(res1);
+            const userQuery = { userEmail: user };
+            const res2 = await userCollection.updateOne(userQuery, { $inc: { userCoin: -10 } });
+            const creatorQuery = { userEmail: creator };
+            const res3 = await userCollection.updateOne(creatorQuery, { $inc: { userCoin: +1 } });
+            res.send(res1, res2, res3)
+        })
     } finally {
         // Ensures that the client will close when you finish/error
-        // await client.close();
+        // await client.close();p
     }
 }
 run().catch(console.dir);
