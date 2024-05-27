@@ -65,6 +65,13 @@ async function run() {
             const result = await recipeCollection.find().project(projection).toArray();
             res.send(result);
         })
+
+        app.get('/coins', async (req, res) => {
+            const email = req.query.email;
+            const query = { userEmail: email };
+            const result = await userCollection.findOne(query);
+            res.send(result);
+        })
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
